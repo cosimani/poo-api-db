@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   poo_mysql:
@@ -52,8 +51,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     volumes:
       - ./app:/app
       - /etc/localtime:/etc/localtime:ro

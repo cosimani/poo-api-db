@@ -1,14 +1,29 @@
+import os
+import hashlib
+from datetime import timedelta, datetime
+from jose import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
-from models.user import User
+
+from models.usuarios import Usuario
 from database import get_db
-from security import verify_password, create_access_token
-from datetime import timedelta
-import os
+
+# 🔐 Configuración desde variables de entorno
+ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("JWT_ALGORITHM")
+
+# 🚨 Verificación obligatoria de variables de entorno
+if not ACCESS_TOKEN_EXPIRE_MINUTES or not SECRET_KEY or not ALGORITHM:
+    raise RuntimeError("Faltan variables requeridas en el entorno (.env): ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, JWT_ALGORITHM")
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(ACCESS_TOKEN_EXPIRE_MINUTES)
 
 router = APIRouter()
 
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+# Función para hashear usando MD5 (solo se recomienda si las claves ya están así guardadas)
+def hash_md5(password: str) -> str:
+    return hashlib.md5(password.encode()).hexdigest()
 
 @router.post("/login", response_model=dict)
 def login(
@@ -16,20 +31,22 @@ def login(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.login == username).first()
-    if not user or not verify_password(password, user.clave):
+    user = db.query(Usuario).filter(Usuario.usuario == username).first()
+
+    if not user or user.clave != hash_md5(password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas",
         )
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token(data={"sub": user.login}, expires_delta=access_token_expires)
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token_data = {"sub": user.usuario, "exp": expire}
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "login": user.login,
+        "usuario": user.usuario,
         "nombre": user.nombre,
         "apellido": user.apellido,
     }
