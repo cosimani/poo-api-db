@@ -50,3 +50,45 @@ def login(
         "nombre": user.nombre,
         "apellido": user.apellido,
     }
+
+
+
+@router.post("/registro", response_model=dict)
+def registrar_usuario(
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    usuario: str = Form(...),
+    clave: str = Form(...),
+    mail: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    # Verificar si ya existe un usuario con el mismo nombre de usuario o correo
+    if db.query(Usuario).filter(Usuario.usuario == usuario).first():
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre de usuario ya está en uso."
+        )
+    if db.query(Usuario).filter(Usuario.mail == mail).first():
+        raise HTTPException(
+            status_code=400,
+            detail="El correo electrónico ya está en uso."
+        )
+
+    # Crear nuevo usuario
+    nuevo_usuario = Usuario(
+        nombre=nombre,
+        apellido=apellido,
+        usuario=usuario,
+        clave=hash_md5(clave),  # Se mantiene MD5 porque tu base ya lo usa así
+        mail=mail
+    )
+
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    return {
+        "mensaje": "Usuario creado exitosamente.",
+        "usuario_id": nuevo_usuario.id,
+        "usuario": nuevo_usuario.usuario
+    }
