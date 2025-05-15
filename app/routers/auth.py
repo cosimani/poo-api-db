@@ -92,3 +92,29 @@ def registrar_usuario(
         "usuario_id": nuevo_usuario.id,
         "usuario": nuevo_usuario.usuario
     }
+
+
+@router.post("/cambiar-clave", response_model=dict)
+def cambiar_clave(
+    usuario: str = Form(...),
+    clave_actual: str = Form(...),
+    nueva_clave: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    # Buscar usuario
+    user = db.query(Usuario).filter(Usuario.usuario == usuario).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    # Verificar clave actual
+    if user.clave != hash_md5(clave_actual):
+        raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta.")
+
+    # Actualizar clave
+    user.clave = hash_md5(nueva_clave)
+    db.commit()
+
+    return {
+        "mensaje": "Contraseña actualizada correctamente."
+    }
+  
